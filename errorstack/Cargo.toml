@@ -10,7 +10,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-errorstack-derive = { version = "0.0.1", path = "../errorstack-derive" }
+errorstack-derive = { version = "0.0.2", path = "../errorstack-derive" }
 
 [dev-dependencies]
 thiserror = "2"
