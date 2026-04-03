@@ -1,8 +1,8 @@
 use errorstack::ErrorStack;
 
 #[derive(ErrorStack)]
-enum Bad {
-    Oops {
+enum AppError {
+    Conflict {
         #[location]
         loc1: &'static std::panic::Location<'static>,
         #[location]

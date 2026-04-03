@@ -102,7 +102,7 @@ fn constructor_without_source() {
 #[test]
 fn location_captured() {
     let expected_line = line!() + 1;
-    let err = MyError::not_found("x".into());
+    let err = MyError::not_found("item-42".into());
     let loc = err.location().expect("should have location");
     assert!(
         loc.file().contains("derive.rs"),
@@ -117,7 +117,7 @@ fn location_captured() {
 
 #[test]
 fn location_optional() {
-    let err = MyError::bare("hello".into());
+    let err = MyError::bare("unlocated".into());
     assert!(
         err.location().is_none(),
         "variant without #[location] should return None"
@@ -126,7 +126,7 @@ fn location_optional() {
 
 #[test]
 fn next_stack() {
-    let inner = InnerError::new("boom".into());
+    let inner = InnerError::new("connection refused".into());
     let err = MyError::inner()(inner);
     assert!(
         err.stack_source().is_some(),
@@ -136,7 +136,7 @@ fn next_stack() {
 
 #[test]
 fn next_plain() {
-    let err = MyError::io("p".into())(std::io::Error::other("x"));
+    let err = MyError::io("data.csv".into())(std::io::Error::other("read failed"));
     assert!(
         err.stack_source().is_none(),
         "should return None without #[stack_source]"
@@ -145,7 +145,7 @@ fn next_plain() {
 
 #[test]
 fn next_stack_boxed() {
-    let inner = InnerError::new("boxed".into());
+    let inner = InnerError::new("type-erased cause".into());
     let boxed: Box<dyn ErrorStack + Send + Sync> = Box::new(inner);
     let err = BoxedError::boxed()(boxed);
     let stack_src = err
@@ -159,7 +159,7 @@ fn next_stack_boxed() {
 
 #[test]
 fn source_by_attribute() {
-    let err = AttrSourceError::wrapped()(std::io::Error::other("attr"));
+    let err = AttrSourceError::wrapped()(std::io::Error::other("permission denied"));
     assert!(
         matches!(&err, AttrSourceError::Wrapped { .. }),
         "should produce Wrapped variant via #[source] attribute"
@@ -174,10 +174,10 @@ fn source_by_attribute() {
 #[test]
 fn multiple_variants() {
     // All variants compile and produce distinct results.
-    let io_err = MyError::io("a".into())(std::io::Error::other(""));
-    let nf_err = MyError::not_found("b".into());
-    let inner_err = MyError::inner()(InnerError::new("c".into()));
-    let bare_err = MyError::bare("d".into());
+    let io_err = MyError::io("config.yaml".into())(std::io::Error::other("not found"));
+    let nf_err = MyError::not_found("user-7".into());
+    let inner_err = MyError::inner()(InnerError::new("timeout".into()));
+    let bare_err = MyError::bare("unexpected state".into());
 
     assert!(matches!(io_err, MyError::Io { .. }), "io variant");
     assert!(
@@ -190,7 +190,7 @@ fn multiple_variants() {
 
 #[test]
 fn struct_error() {
-    let err = InnerError::new("test".into());
+    let err = InnerError::new("missing field".into());
     let loc = err.location().expect("struct should have location");
     assert!(
         loc.file().contains("derive.rs"),
@@ -202,8 +202,8 @@ fn struct_error() {
 fn location_through_closure() {
     // The location should be captured at the outer call site, not inside the closure.
     let expected_line = line!() + 1;
-    let make = MyError::io("z".into());
-    let err = make(std::io::Error::other(""));
+    let make = MyError::io("output.log".into());
+    let err = make(std::io::Error::other("disk full"));
     let loc = err.location().expect("should have location");
     assert_eq!(
         loc.line(),
@@ -214,7 +214,7 @@ fn location_through_closure() {
 
 #[test]
 fn stack_source_implies_source() {
-    let inner = InnerError::new("implied".into());
+    let inner = InnerError::new("cascade failure".into());
     let err = ImpliedSourceError::implied()(inner);
     assert!(
         err.stack_source().is_some(),

@@ -1,0 +1,5 @@
+error: deriving From requires no fields other than source and backtrace
+  --> tests/compile_fail/from_with_location.rs:10:9
+   |
+10 |         #[from]
+   |         ^^^^^^^

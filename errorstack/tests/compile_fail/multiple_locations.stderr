@@ -1,0 +1,5 @@
+error: variant `Conflict` has multiple location fields
+ --> tests/compile_fail/multiple_locations.rs:9:9
+  |
+9 |         loc2: &'static std::panic::Location<'static>,
+  |         ^^^^

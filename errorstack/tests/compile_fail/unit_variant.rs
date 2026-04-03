@@ -1,8 +1,8 @@
 use errorstack::ErrorStack;
 
 #[derive(ErrorStack)]
-enum Bad {
-    Oops,
+enum AppError {
+    Failure,
 }
 
 fn main() {}

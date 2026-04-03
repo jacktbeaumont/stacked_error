@@ -3,8 +3,8 @@
 use errorstack::ErrorStack;
 
 #[derive(ErrorStack)]
-enum Bad {
-    Oops {
+enum AppError {
+    Invalid {
         #[stack_source]
         not_a_source: String,
     },

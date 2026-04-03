@@ -1,0 +1,5 @@
+error: ErrorStack derive is not supported on unions
+ --> tests/compile_fail/union_error.rs:4:7
+  |
+4 | union Payload {
+  |       ^^^^^^^

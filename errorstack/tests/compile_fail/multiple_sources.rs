@@ -1,8 +1,8 @@
 use errorstack::ErrorStack;
 
 #[derive(ErrorStack)]
-enum Bad {
-    Oops {
+enum AppError {
+    Conflict {
         source: std::io::Error,
         #[source]
         other: std::io::Error,

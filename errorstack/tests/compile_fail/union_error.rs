@@ -1,9 +1,9 @@
 use errorstack::ErrorStack;
 
 #[derive(ErrorStack)]
-union Bad {
-    a: u32,
-    b: f32,
+union Payload {
+    int: u32,
+    float: f32,
 }
 
 fn main() {}

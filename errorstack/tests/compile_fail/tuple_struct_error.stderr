@@ -1,0 +1,5 @@
+error: ErrorStack derive requires named fields
+ --> tests/compile_fail/tuple_struct_error.rs:4:8
+  |
+4 | struct AppError(String);
+  |        ^^^^^^^^

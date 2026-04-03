@@ -1,0 +1,5 @@
+error: ErrorStack derive requires named (struct) variants; found unit variant `Failure`
+ --> tests/compile_fail/unit_variant.rs:5:5
+  |
+5 |     Failure,
+  |     ^^^^^^^

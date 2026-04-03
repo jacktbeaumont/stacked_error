@@ -4,9 +4,9 @@
 use errorstack::ErrorStack;
 
 #[derive(thiserror::Error, ErrorStack, Debug)]
-enum Bad {
-    #[error("oops")]
-    Oops {
+enum AppError {
+    #[error("conversion failed")]
+    Conversion {
         #[from]
         source: std::io::Error,
         #[location]

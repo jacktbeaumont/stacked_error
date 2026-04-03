@@ -1,6 +1,6 @@
 use errorstack::ErrorStack;
 
 #[derive(ErrorStack)]
-struct Bad(String);
+struct AppError(String);
 
 fn main() {}
