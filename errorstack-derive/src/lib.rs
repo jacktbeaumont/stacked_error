@@ -23,7 +23,7 @@ use syn::{Data, DeriveInput, Field, Fields, Ident};
 /// | Attribute         | Effect                                                                    | Auto-detected |
 /// |-------------------|---------------------------------------------------------------------------|---------------|
 /// | `#[source]`       | Marks a field as the error source.                                        | when field is named `source` |
-/// | `#[stack_source]` | Marks the field as both the error source and an [`ErrorStack`] implementor, enabling typed chain walking via [`stack_source`](ErrorStack::stack_source). Implies `#[source]`. | no |
+/// | `#[stack_source]` | Marks the field as both the error source and an [`ErrorStack`] implementor, enabling typed chain walking via `ErrorStack::stack_source`. Implies `#[source]`. | no |
 /// | `#[location]`     | Indicates the field stores a `&'static Location<'static>`, captured automatically at construction time. | no |
 ///
 /// These attributes follow the same field conventions as
@@ -54,7 +54,8 @@ use syn::{Data, DeriveInput, Field, Fields, Ident};
 ///
 /// # Examples
 ///
-/// The macro may be derived on enums and structs with named fields. This examples shows both, with `thiserror` compatibility.
+/// The macro may be derived on enums and structs with named fields. This
+/// example shows both, with `thiserror` compatibility.
 ///
 /// ```
 /// # use errorstack::ErrorStack;
@@ -95,7 +96,7 @@ use syn::{Data, DeriveInput, Field, Fields, Ident};
 ///
 /// The derive above generates the following constructors:
 ///
-/// ```rust,ignore
+/// ```text
 /// // AppError: one constructor per variant
 /// impl AppError {
 ///     // Source variants return a closure for use with map_err.
@@ -111,7 +112,8 @@ use syn::{Data, DeriveInput, Field, Fields, Ident};
 /// }
 /// ```
 ///
-/// Source and location fields are handled automatically by these constructors, keeping call sites concise:
+/// Source and location fields are handled automatically by these
+/// constructors, keeping call sites concise:
 ///
 /// ```
 /// # use errorstack::ErrorStack;

@@ -159,6 +159,7 @@ impl ErrorStack for Box<dyn ErrorStack + Send + Sync> {
 /// optional source-code [`Location`].
 ///
 /// [`Location`]: std::panic::Location
+#[derive(Debug, Clone)]
 pub struct Entry {
     message: String,
     location: Option<&'static std::panic::Location<'static>>,
@@ -209,6 +210,7 @@ impl Entry {
 /// ```
 ///
 /// [`Error::source`]: std::error::Error::source
+#[derive(Clone)]
 pub struct Report {
     entries: Vec<Entry>,
 }
@@ -257,6 +259,13 @@ impl Report {
     /// Returns an iterator over the [`Entry`] values in this report, from the
     /// outermost error to the root cause.
     pub fn entries(&self) -> impl Iterator<Item = &Entry> {
+        self.entries.iter()
+    }
+
+    /// Returns an iterator over the [`Entry`] values in this report.
+    ///
+    /// This is equivalent to [`entries`](Report::entries).
+    pub fn iter(&self) -> impl Iterator<Item = &Entry> {
         self.entries.iter()
     }
 }
