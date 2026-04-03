@@ -1,3 +1,124 @@
+//! A derive-based typed error system with first-class error stack building.
+//!
+//! `errorstack` provides source-code location tracking and typed error chain
+//! walking for error types. The crate centres on a single derive macro,
+//! `#[derive(ErrorStack)]`, which:
+//!
+//! - **Implements the [`ErrorStack`] trait** — each error gains a
+//!   [`location`](ErrorStack::location) method that returns the call site
+//!   where it was constructed and a
+//!   [`stack_source`](ErrorStack::stack_source) method that returns the
+//!   next typed link in the error chain.
+//! - **Generates `#[track_caller]` constructors** — one constructor per
+//!   enum variant (or a single `new` method for structs) that
+//!   automatically captures the caller's source-code location and accepts
+//!   the source error when present. Source-bearing constructors return
+//!   `impl FnOnce(SourceType) -> Self`, composing directly with
+//!   [`Result::map_err`] without an intermediate closure.
+//!
+//! Together these allow the creation of a [`Report`] to walk the full typed
+//! chain, generating a traceback for the error with source-code locations.
+//!
+//! # Motivation
+//!
+//! The standard [`Error::source`](std::error::Error::source) chain erases
+//! concrete types behind `&dyn Error`, losing any additional context the
+//! error carried. Backtraces recover runtime stack frames but not the
+//! logical error frames an application constructs as it propagates
+//! failures upward. `errorstack` bridges this gap: each error records the
+//! source-code location where it was created and holds a typed reference to
+//! the next error in the chain, so the full causal history is available for
+//! both programmatic inspection and formatted display.
+//!
+//! # Quick start
+//!
+//! ```
+//! use errorstack::{ErrorStack, Report};
+//!
+//! #[derive(thiserror::Error, ErrorStack, Debug)]
+//! pub enum AppError {
+//!     #[error("io failed: {path}")]
+//!     Io {
+//!         path: String,
+//!         source: std::io::Error,
+//!         #[location]
+//!         location: &'static std::panic::Location<'static>,
+//!     },
+//!
+//!     #[error("config failed")]
+//!     Config {
+//!         #[stack_source]
+//!         source: ConfigError,
+//!         #[location]
+//!         location: &'static std::panic::Location<'static>,
+//!     },
+//! }
+//!
+//! #[derive(thiserror::Error, ErrorStack, Debug)]
+//! #[error("invalid config: {detail}")]
+//! pub struct ConfigError {
+//!     detail: String,
+//!     #[location]
+//!     location: &'static std::panic::Location<'static>,
+//! }
+//!
+//! fn load_config() -> Result<(), AppError> {
+//!     let inner = ConfigError::new("missing field `port`".into());
+//!     Err(AppError::config()(inner))
+//! }
+//!
+//! let err = load_config().unwrap_err();
+//! let report = Report::new(&err);
+//! assert_eq!(report.entries().count(), 2);
+//! ```
+//!
+//! Printing `report` produces output similar to:
+//!
+//! ```text
+//! Error: config failed
+//!       at src/main.rs:14:9
+//!
+//! Caused by this error:
+//!   1: invalid config: missing field `port`
+//!         at src/main.rs:13:17
+//! ```
+//!
+//! # Core concepts
+//!
+//! ## The [`ErrorStack`] trait
+//!
+//! [`ErrorStack`] extends [`Error`](std::error::Error) with two methods:
+//!
+//! - [`location`](ErrorStack::location) — returns the
+//!   [`std::panic::Location`] where the error was constructed, or [`None`]
+//!   if location tracking is not present for this error.
+//! - [`stack_source`](ErrorStack::stack_source) — returns the next
+//!   [`ErrorStack`] implementor in the chain, or [`None`] if this error is
+//!   the root cause (or if the underlying source does not implement
+//!   [`ErrorStack`]).
+//!
+//! The trait is typically derived rather than implemented by hand. See the
+//! [derive macro documentation](derive@ErrorStack) for the full attribute
+//! reference, naming conventions, and generated constructor signatures.
+//!
+//! ## [`Report`]
+//!
+//! [`Report`] collects an entire error chain into a list of [`Entry`]
+//! values, each pairing an error message with a source-code
+//! location where available.
+//!
+//! [`Report`] provides a default [`Display`](std::fmt::Display)
+//! implementation that renders the chain in a human-readable format with
+//! the outermost error first, followed by numbered causes and their
+//! locations. Callers that need a different structure — for example,
+//! emitting each frame as a structured telemetry event — can iterate over
+//! the [`Entry`] values directly via [`Report::entries`].
+//!
+//! # Compatibility with `thiserror`
+//!
+//! `errorstack` uses the same field conventions as
+//! [`thiserror`](https://crates.io/crates/thiserror) and is designed to
+//! pair with it.
 pub use errorstack_derive::ErrorStack;
 
 /// An error within a typed error stack, preserving full error context as
