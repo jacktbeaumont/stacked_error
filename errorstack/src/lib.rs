@@ -301,7 +301,11 @@ impl Report {
     /// [`ErrorStack`], the walk falls back to [`Error::source`].
     ///
     /// [`Error::source`]: std::error::Error::source
-    pub fn new(err: &dyn ErrorStack) -> Self {
+    pub fn new(err: &impl ErrorStack) -> Self {
+        Self::from_dyn(err)
+    }
+
+    fn from_dyn(err: &dyn ErrorStack) -> Self {
         let mut entries = Vec::new();
 
         let mut current: &dyn ErrorStack = err;
@@ -366,7 +370,7 @@ impl Report {
 
 impl<'a> From<&'a dyn ErrorStack> for Report {
     fn from(err: &'a dyn ErrorStack) -> Self {
-        Self::new(err)
+        Self::from_dyn(err)
     }
 }
 
