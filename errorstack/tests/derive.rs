@@ -101,8 +101,8 @@ fn constructor_without_source() {
 
 #[test]
 fn location_captured() {
+    let expected_line = line!() + 1;
     let err = MyError::not_found("x".into());
-    let expected_line = line!();
     let loc = err.location().expect("should have location");
     assert!(
         loc.file().contains("derive.rs"),
@@ -201,8 +201,8 @@ fn struct_error() {
 #[test]
 fn location_through_closure() {
     // The location should be captured at the outer call site, not inside the closure.
+    let expected_line = line!() + 1;
     let make = MyError::io("z".into());
-    let expected_line = line!() - 1;
     let err = make(std::io::Error::other(""));
     let loc = err.location().expect("should have location");
     assert_eq!(
