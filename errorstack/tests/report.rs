@@ -66,7 +66,11 @@ fn report_chain_typed() {
     let messages: Vec<_> = entries.iter().map(|e| e.message().to_owned()).collect();
     assert_eq!(
         messages,
-        vec!["top: request failed", "middle: service unavailable", "bottom: connection refused"],
+        vec![
+            "top: request failed",
+            "middle: service unavailable",
+            "bottom: connection refused"
+        ],
         "typed chain should produce entries in source order"
     );
     assert!(

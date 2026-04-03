@@ -56,7 +56,7 @@ use syn::{Data, DeriveInput, Field, Fields, Ident};
 ///
 /// The macro may be derived on enums and structs with named fields. This examples shows both, with `thiserror` compatibility.
 ///
-/// ```no_run
+/// ```
 /// # use errorstack::ErrorStack;
 /// #[derive(thiserror::Error, ErrorStack, Debug)]
 /// pub enum AppError {
@@ -113,7 +113,7 @@ use syn::{Data, DeriveInput, Field, Fields, Ident};
 ///
 /// Source and location fields are handled automatically by these constructors, keeping call sites concise:
 ///
-/// ```no_run
+/// ```
 /// # use errorstack::ErrorStack;
 /// # #[derive(thiserror::Error, ErrorStack, Debug)]
 /// # pub enum AppError {
@@ -132,11 +132,11 @@ use syn::{Data, DeriveInput, Field, Fields, Ident};
 /// #     },
 /// # }
 /// # fn main() -> Result<(), AppError> {
-/// let content = std::fs::read_to_string("app.toml")
-///     .map_err(AppError::io("app.toml".into()))?;
+/// let _content = std::fs::read_to_string("Cargo.toml")
+///     .map_err(AppError::io("Cargo.toml".into()))?;
 ///
-/// let id = "abc".to_string();
-/// return Err(AppError::not_found(id));
+/// let _err = AppError::not_found("abc".into());
+/// # Ok(())
 /// # }
 /// ```
 #[proc_macro_derive(ErrorStack, attributes(source, stack_source, location))]

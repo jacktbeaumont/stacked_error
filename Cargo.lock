@@ -21,10 +21,12 @@ dependencies = [
 name = "errorstack-derive"
 version = "0.0.1"
 dependencies = [
+ "errorstack",
  "heck",
  "proc-macro2",
  "quote",
  "syn",
+ "thiserror",
 ]
 
 [[package]]
