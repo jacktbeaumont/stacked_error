@@ -11,12 +11,10 @@ use syn::{Data, DeriveInput, Field, Fields, Ident};
 /// [`Error`](std::error::Error). This can be accomplished manually or via
 /// [`thiserror`](https://crates.io/crates/thiserror).
 ///
-/// This macro:
-///
-/// - Implements [`ErrorStack`] according to field names and attributes.
-/// - Generates an ergonomic constructor for each struct or enum variant
-///   that captures caller location via `#[track_caller]` and composes
-///   naturally with [`Result::map_err`] for error chaining.
+/// This macro implements [`ErrorStack`] according to field names and
+/// attributes, and generates an ergonomic constructor for each struct or
+/// enum variant that captures caller location via `#[track_caller]` and
+/// composes naturally with [`Result::map_err`] for error chaining.
 ///
 /// # Attributes
 ///
@@ -25,8 +23,8 @@ use syn::{Data, DeriveInput, Field, Fields, Ident};
 /// | Attribute         | Effect                                                                    | Auto-detected |
 /// |-------------------|---------------------------------------------------------------------------|---------------|
 /// | `#[source]`       | Marks a field as the error source.                                        | when field is named `source` |
-/// | `#[stack_source]` | Marks the field as both the error source and an [`ErrorStack`] implementor, enabling typed chain walking via [`stack_source`](ErrorStack::stack_source). Implies `#[source]`. | — |
-/// | `#[location]`     | Indicates the field stores a `&'static Location<'static>`, captured automatically at construction time. | — |
+/// | `#[stack_source]` | Marks the field as both the error source and an [`ErrorStack`] implementor, enabling typed chain walking via [`stack_source`](ErrorStack::stack_source). Implies `#[source]`. | no |
+/// | `#[location]`     | Indicates the field stores a `&'static Location<'static>`, captured automatically at construction time. | no |
 ///
 /// These attributes follow the same field conventions as
 /// [`thiserror`](https://crates.io/crates/thiserror), allowing
@@ -42,15 +40,12 @@ use syn::{Data, DeriveInput, Field, Fields, Ident};
 ///
 /// # Error constructors
 ///
-/// This macro also generates helper constructors for each struct or enum variant. They provide the following benefits:
-///
-/// 1. **Automatic location capture** — every constructor is marked
-///    `#[track_caller]`, so the call-site location is recorded without
-///    manual boilerplate.
-/// 2. **Ergonomic error chaining** — when a source field is present the
-///    constructor returns `impl FnOnce(SourceTy) -> Self`, so it can be
-///    passed directly to [`Result::map_err`] without an intermediate
-///    closure.
+/// This macro also generates helper constructors for each struct or enum
+/// variant. Every constructor is marked `#[track_caller]`, so the
+/// call-site location is recorded without manual boilerplate. When a
+/// source field is present the constructor returns
+/// `impl FnOnce(SourceTy) -> Self`, so it can be passed directly to
+/// [`Result::map_err`] without an intermediate closure.
 ///
 /// Constructors are `pub(crate)` and named `new` for structs or
 /// `snake_cased_variant` for enum variants. Remaining fields
@@ -101,7 +96,7 @@ use syn::{Data, DeriveInput, Field, Fields, Ident};
 /// The derive above generates the following constructors:
 ///
 /// ```rust,ignore
-/// // AppError — one constructor per variant
+/// // AppError: one constructor per variant
 /// impl AppError {
 ///     // Source variants return a closure for use with map_err.
 ///     pub(crate) fn io(path: String) -> impl FnOnce(io::Error) -> Self;
@@ -110,7 +105,7 @@ use syn::{Data, DeriveInput, Field, Fields, Ident};
 ///     pub(crate) fn not_found(id: String) -> Self;
 /// }
 ///
-/// // ConfigError — struct constructor is named `new`
+/// // ConfigError: struct constructor is named `new`
 /// impl ConfigError {
 ///     pub(crate) fn new(detail: String) -> Self;
 /// }

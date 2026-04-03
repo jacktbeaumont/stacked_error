@@ -6,14 +6,13 @@
 [![Rust 1.70.0+](https://img.shields.io/badge/rust-1.70.0%2B-orange.svg)](https://www.rust-lang.org)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-A derive-based typed error system with first-class error stack building for Rust.
+`errorstack` is a typed error system with error stacks and source-code location tracking for Rust.
 
-`errorstack` provides source-code location tracking and typed error chain walking for error types. The crate centres on a single derive macro, `#[derive(ErrorStack)]`, which:
+The crate provides the `ErrorStack` trait, which extends `std::error::Error` with two methods: `stack_source()` returning the next typed link in the error chain, and `location()` returning the source-code location where the error was constructed.
 
-- **Implements the `ErrorStack` trait** — each error gains a `location()` method that returns the call site where it was constructed and a `stack_source()` method that returns the next typed link in the error chain.
-- **Generates `#[track_caller]` constructors** — one constructor per enum variant (or a single `new` method for structs) that automatically captures the caller's source-code location and accepts the source error when present. Source-bearing constructors return `impl FnOnce(SourceType) -> Self`, composing directly with `Result::map_err` without an intermediate closure.
+The trait is mainly used via `#[derive(ErrorStack)]`, which implements `ErrorStack` based on field names and attributes. The macro also generates helper constructors that automatically capture the call-site location, and when a source field is present return a closure allowing ergonomic chaining with `Result::map_err`.
 
-Together these allow the creation of a `Report` to walk the full typed chain, generating a traceback for the error with source-code locations.
+An `ErrorStack` can be converted into a `Report`, which walks the full typed chain and produces a traceback with source-code locations.
 
 ## Motivation
 
@@ -72,26 +71,7 @@ Caused by this error:
         at src/main.rs:21:9
 ```
 
-## Core concepts
-
-### The `ErrorStack` trait
-
-`ErrorStack` extends `Error` with two methods:
-
-- **`location`** — returns the `std::panic::Location` where the error was constructed, or `None` if location tracking is not present for this error.
-- **`stack_source`** — returns the next `ErrorStack` implementor in the chain, or `None` if this error is the root cause (or if the underlying source does not implement `ErrorStack`).
-
-The trait is typically derived rather than implemented by hand. See the [derive macro documentation](https://docs.rs/errorstack/latest/errorstack/derive.ErrorStack.html) for the full attribute reference, naming conventions, and generated constructor signatures.
-
-### `Report`
-
-`Report` collects an entire error chain into a list of `Entry` values, each pairing an error message with a source-code location where available.
-
-`Report` provides a default `Display` implementation that renders the chain in a human-readable format with the outermost error first, followed by numbered causes and their locations. Callers that need a different structure — for example, emitting each frame as a structured telemetry event — can iterate over the `Entry` values directly via `Report::entries`.
-
-## Compatibility with `thiserror`
-
-`errorstack` uses the same field conventions as [`thiserror`](https://crates.io/crates/thiserror) and is designed to pair with it.
+See the [crate documentation](https://docs.rs/errorstack) and the [derive macro documentation](https://docs.rs/errorstack/latest/errorstack/derive.ErrorStack.html) for more information.
 
 ## License
 
