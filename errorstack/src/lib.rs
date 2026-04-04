@@ -109,6 +109,36 @@
 //! emitting each frame as a structured telemetry event) can iterate over
 //! the [`Entry`] values directly via [`Report::entries`].
 //!
+//! # Optional sources
+//!
+//! A source field may be `Option<T>` when an error does not always have an
+//! underlying cause. The derive macro generates two constructors in this
+//! case: one that sets the source to [`None`], and a `_with` variant that
+//! accepts the inner error and wraps it in [`Some`]. See the
+//! [derive macro documentation](derive@ErrorStack#optional-sources) for
+//! details.
+//!
+//! ```
+//! use errorstack::ErrorStack;
+//!
+//! #[derive(thiserror::Error, ErrorStack, Debug)]
+//! #[error("lookup failed: {key}")]
+//! pub struct LookupError {
+//!     key: String,
+//!     source: Option<std::io::Error>,
+//!     #[location]
+//!     location: &'static std::panic::Location<'static>,
+//! }
+//!
+//! let err = LookupError::new("missing-key".into());
+//!
+//! # fn try_lookup() -> Result<(), LookupError> {
+//! let _data = std::fs::read_to_string("db.json")
+//!     .map_err(LookupError::new_with("db-key".into()))?;
+//! # Ok(())
+//! # }
+//! ```
+//!
 //! # Compatibility with `thiserror`
 //!
 //! `errorstack` uses the same field conventions as

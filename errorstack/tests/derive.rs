@@ -76,6 +76,37 @@ pub enum BoxedError {
     },
 }
 
+/// Error with optional source fields.
+#[derive(thiserror::Error, ErrorStack, Debug)]
+pub enum OptionalSourceError {
+    #[error("maybe io: {path}")]
+    MaybeIo {
+        path: String,
+        source: Option<std::io::Error>,
+        #[location]
+        location: &'static std::panic::Location<'static>,
+    },
+
+    #[error("maybe inner")]
+    MaybeInner {
+        #[stack_source]
+        source: Option<InnerError>,
+        #[location]
+        location: &'static std::panic::Location<'static>,
+    },
+}
+
+/// Struct with an optional stack source.
+#[derive(thiserror::Error, ErrorStack, Debug)]
+#[error("optional struct: {detail}")]
+pub struct OptionalStructError {
+    detail: String,
+    #[stack_source]
+    source: Option<InnerError>,
+    #[location]
+    location: &'static std::panic::Location<'static>,
+}
+
 // ── Tests ──
 
 #[test]
@@ -219,5 +250,78 @@ fn stack_source_implies_source() {
     assert!(
         err.stack_source().is_some(),
         "#[stack_source] should imply source and enable typed chain walking"
+    );
+}
+
+#[test]
+fn optional_source_enum() {
+    let without = OptionalSourceError::maybe_io("a.txt".into());
+    assert!(
+        matches!(&without, OptionalSourceError::MaybeIo { source: None, .. }),
+        "sourceless constructor should set source to None"
+    );
+
+    let with = OptionalSourceError::maybe_io_with("b.txt".into())(std::io::Error::new(
+        std::io::ErrorKind::NotFound,
+        "gone",
+    ));
+    assert!(
+        matches!(
+            &with,
+            OptionalSourceError::MaybeIo {
+                source: Some(_),
+                ..
+            }
+        ),
+        "_with constructor should wrap source in Some"
+    );
+
+    let absent = OptionalSourceError::maybe_inner();
+    assert!(
+        absent.stack_source().is_none(),
+        "optional stack_source should return None when source is absent"
+    );
+
+    let present = OptionalSourceError::maybe_inner_with()(InnerError::new("deep".into()));
+    assert!(
+        present.stack_source().is_some(),
+        "optional stack_source should return Some when source is present"
+    );
+}
+
+#[test]
+fn optional_source_struct() {
+    let without = OptionalStructError::new("no cause".into());
+    assert!(
+        without.stack_source().is_none(),
+        "struct new() should set optional source to None"
+    );
+
+    let with = OptionalStructError::new_with("has cause".into())(InnerError::new("cause".into()));
+    assert!(
+        with.stack_source().is_some(),
+        "struct new_with() should enable stack_source"
+    );
+}
+
+#[test]
+fn optional_source_location() {
+    let expected_line = line!() + 1;
+    let without = OptionalSourceError::maybe_io("a.txt".into());
+    let loc = without.location().expect("should have location");
+    assert_eq!(
+        loc.line(),
+        expected_line,
+        "sourceless constructor should capture location"
+    );
+
+    let expected_line_with = line!() + 1;
+    let make = OptionalSourceError::maybe_io_with("b.txt".into());
+    let with = make(std::io::Error::other("fail"));
+    let loc_with = with.location().expect("should have location");
+    assert_eq!(
+        loc_with.line(),
+        expected_line_with,
+        "_with constructor should capture location at outer call site"
     );
 }
