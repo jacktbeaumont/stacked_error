@@ -55,7 +55,7 @@ fn load_config() -> Result<(), ConfigError> {
 }
 
 fn run() -> Result<(), AppError> {
-    load_config().map_err(AppError::config())?;
+    load_config().map_err(AppError::config)?;
     Ok(())
 }
 ```

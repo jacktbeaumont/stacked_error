@@ -158,7 +158,7 @@ fn location_optional() {
 #[test]
 fn next_stack() {
     let inner = InnerError::new("connection refused".into());
-    let err = MyError::inner()(inner);
+    let err = MyError::inner(inner);
     assert!(
         err.stack_source().is_some(),
         "should return Some for #[stack_source]"
@@ -178,7 +178,7 @@ fn next_plain() {
 fn next_stack_boxed() {
     let inner = InnerError::new("type-erased cause".into());
     let boxed: Box<dyn ErrorStack + Send + Sync> = Box::new(inner);
-    let err = BoxedError::boxed()(boxed);
+    let err = BoxedError::boxed(boxed);
     let stack_src = err
         .stack_source()
         .expect("boxed #[stack_source] should return Some");
@@ -190,7 +190,7 @@ fn next_stack_boxed() {
 
 #[test]
 fn source_by_attribute() {
-    let err = AttrSourceError::wrapped()(std::io::Error::other("permission denied"));
+    let err = AttrSourceError::wrapped(std::io::Error::other("permission denied"));
     assert!(
         matches!(&err, AttrSourceError::Wrapped { .. }),
         "should produce Wrapped variant via #[source] attribute"
@@ -207,7 +207,7 @@ fn multiple_variants() {
     // All variants compile and produce distinct results.
     let io_err = MyError::io("config.yaml".into())(std::io::Error::other("not found"));
     let nf_err = MyError::not_found("user-7".into());
-    let inner_err = MyError::inner()(InnerError::new("timeout".into()));
+    let inner_err = MyError::inner(InnerError::new("timeout".into()));
     let bare_err = MyError::bare("unexpected state".into());
 
     assert!(matches!(io_err, MyError::Io { .. }), "io variant");
@@ -246,7 +246,7 @@ fn location_through_closure() {
 #[test]
 fn stack_source_implies_source() {
     let inner = InnerError::new("cascade failure".into());
-    let err = ImpliedSourceError::implied()(inner);
+    let err = ImpliedSourceError::implied(inner);
     assert!(
         err.stack_source().is_some(),
         "#[stack_source] should imply source and enable typed chain walking"

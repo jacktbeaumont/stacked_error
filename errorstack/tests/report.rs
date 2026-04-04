@@ -82,7 +82,7 @@ fn report_chain_typed() {
 #[test]
 fn report_source_tail() {
     let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "file not found");
-    let bridge = PlainSourceError::new()(io_err);
+    let bridge = PlainSourceError::new(io_err);
     let report = Report::new(&bridge);
     let messages: Vec<_> = report.entries().map(|e| e.message().to_owned()).collect();
     assert_eq!(

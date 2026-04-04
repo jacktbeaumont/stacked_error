@@ -55,9 +55,11 @@ use syn::{Data, DeriveInput, Field, Fields, Ident};
 /// This macro also generates helper constructors for each struct or enum
 /// variant. Every constructor is marked `#[track_caller]`, so the
 /// call-site location is recorded without manual boilerplate. When a
-/// source field is present the constructor returns
-/// `impl FnOnce(SourceTy) -> Self`, so it can be passed directly to
-/// [`Result::map_err`] without an intermediate closure.
+/// source field is present alongside user fields, the constructor returns
+/// `impl FnOnce(SourceTy) -> Self`, capturing the user fields and
+/// composing directly with [`Result::map_err`]. When the source is the
+/// only field, the constructor takes it as a parameter and returns `Self`
+/// directly.
 ///
 /// Constructors are `pub(crate)` and named `new` for structs or
 /// `snake_cased_variant` for enum variants. Remaining fields
@@ -112,7 +114,7 @@ use syn::{Data, DeriveInput, Field, Fields, Ident};
 /// impl AppError {
 ///     // Source variants return a closure for use with map_err.
 ///     pub(crate) fn io(path: String) -> impl FnOnce(io::Error) -> Self;
-///     pub(crate) fn inner() -> impl FnOnce(ConfigError) -> Self;
+///     pub(crate) fn inner(source: ConfigError) -> Self;
 ///     // Sourceless variants return Self directly.
 ///     pub(crate) fn not_found(id: String) -> Self;
 /// }
@@ -433,6 +435,19 @@ fn gen_constructor(ctx: &ConstructorCtx, parsed: &ParsedFields<'_>) -> TokenStre
                     move |#src_ident| #self_path {
                         #src_ident: Some(#src_ident),
                         #(#user_field_names,)*
+                        #location_init
+                    }
+                }
+            }
+        } else if parsed.user_fields.is_empty() {
+            let src_ty = &src.ty;
+            quote! {
+                #[doc = #doc]
+                #[track_caller]
+                pub(crate) fn #method_name(#src_ident: #src_ty) -> Self {
+                    #location_capture
+                    #self_path {
+                        #src_ident,
                         #location_init
                     }
                 }

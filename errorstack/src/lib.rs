@@ -58,7 +58,7 @@
 //!
 //! fn load_config() -> Result<(), AppError> {
 //!     let inner = ConfigError::new("missing field `port`".into());
-//!     Err(AppError::config()(inner))
+//!     Err(AppError::config(inner))
 //! }
 //!
 //! let err = load_config().unwrap_err();
@@ -218,7 +218,7 @@ pub trait ErrorStack: std::error::Error + Send + Sync + 'static {
     ///     location: &'static std::panic::Location<'static>,
     /// }
     ///
-    /// let err = Outer::new()(Inner::new());
+    /// let err = Outer::new(Inner::new());
     /// assert!(err.stack_source().is_some());
     /// ```
     fn stack_source(&self) -> Option<&dyn ErrorStack> {
