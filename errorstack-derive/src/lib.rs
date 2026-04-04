@@ -38,6 +38,18 @@ use syn::{Data, DeriveInput, Field, Fields, Ident};
 /// treated as a plain [`std::error::Error`] and chain walking stops at that
 /// field.
 ///
+/// # Optional sources
+///
+/// A source field may be wrapped in [`Option`] to represent errors that
+/// do not always have an underlying cause. When the macro detects an
+/// `Option<T>` source field, it generates two constructors instead of
+/// one:
+///
+/// | Constructor | Signature | Source value |
+/// |-------------|-----------|-------------|
+/// | `variant_name` / `new` | `(user_fields…) -> Self` | `None` |
+/// | `variant_name_with` / `new_with` | `(user_fields…) -> impl FnOnce(T) -> Self` | `Some(source)` |
+///
 /// # Error constructors
 ///
 /// This macro also generates helper constructors for each struct or enum
@@ -97,7 +109,6 @@ use syn::{Data, DeriveInput, Field, Fields, Ident};
 /// The derive above generates the following constructors:
 ///
 /// ```text
-/// // AppError: one constructor per variant
 /// impl AppError {
 ///     // Source variants return a closure for use with map_err.
 ///     pub(crate) fn io(path: String) -> impl FnOnce(io::Error) -> Self;
@@ -106,7 +117,6 @@ use syn::{Data, DeriveInput, Field, Fields, Ident};
 ///     pub(crate) fn not_found(id: String) -> Self;
 /// }
 ///
-/// // ConfigError: struct constructor is named `new`
 /// impl ConfigError {
 ///     pub(crate) fn new(detail: String) -> Self;
 /// }
@@ -235,7 +245,11 @@ fn derive_impl(input: DeriveInput) -> syn::Result<TokenStream2> {
             let stack_source_body = if parsed.stack_source {
                 let src = parsed.source.as_ref().unwrap();
                 let src_ident = &src.ident;
-                quote! { Some(&self.#src_ident as &dyn ::errorstack::ErrorStack) }
+                if parsed.optional_source {
+                    quote! { self.#src_ident.as_ref().map(|s| s as &dyn ::errorstack::ErrorStack) }
+                } else {
+                    quote! { Some(&self.#src_ident as &dyn ::errorstack::ErrorStack) }
+                }
             } else {
                 quote! { None }
             };
@@ -268,11 +282,35 @@ struct ParsedFields<'a> {
     source: Option<&'a Field>,
     location: Option<&'a Field>,
     stack_source: bool,
+    optional_source: bool,
+    /// The inner type `T` when source is `Option<T>`.
+    inner_source_ty: Option<syn::Type>,
     user_fields: Vec<&'a Field>,
 }
 
 fn attr(field: &Field, name: &str) -> bool {
     field.attrs.iter().any(|a| a.path().is_ident(name))
+}
+
+/// If `ty` is `Option<T>`, returns the inner type `T`.
+fn extract_option_inner(ty: &syn::Type) -> Option<&syn::Type> {
+    let syn::Type::Path(type_path) = ty else {
+        return None;
+    };
+    let segment = type_path.path.segments.last()?;
+    if segment.ident != "Option" {
+        return None;
+    }
+    let syn::PathArguments::AngleBracketed(args) = &segment.arguments else {
+        return None;
+    };
+    if args.args.len() != 1 {
+        return None;
+    }
+    let syn::GenericArgument::Type(inner) = args.args.first()? else {
+        return None;
+    };
+    Some(inner)
 }
 
 fn parse_fields<'a>(
@@ -282,6 +320,8 @@ fn parse_fields<'a>(
     let mut source: Option<&Field> = None;
     let mut location: Option<&Field> = None;
     let mut stack_source = false;
+    let mut optional_source = false;
+    let mut inner_source_ty = None;
     let mut user_fields = Vec::new();
 
     for field in fields {
@@ -302,6 +342,10 @@ fn parse_fields<'a>(
             if stack_source_attr {
                 stack_source = true;
             }
+            if let Some(inner) = extract_option_inner(&field.ty) {
+                optional_source = true;
+                inner_source_ty = Some(inner.clone());
+            }
         } else if location_attr {
             if location.is_some() {
                 return Err(syn::Error::new(
@@ -319,15 +363,30 @@ fn parse_fields<'a>(
         source,
         location,
         stack_source,
+        optional_source,
+        inner_source_ty,
         user_fields,
     })
 }
 
-fn gen_constructor_enum(variant_name: &Ident, parsed: &ParsedFields<'_>) -> TokenStream2 {
-    let method_name = Ident::new(
-        &variant_name.to_string().to_snake_case(),
-        variant_name.span(),
-    );
+/// Names and self-expression that vary between enum variants and structs.
+struct ConstructorCtx {
+    method_name: Ident,
+    with_method_name: Ident,
+    doc: String,
+    doc_with: String,
+    /// Token stream for constructing the type, e.g. `Self::Variant` or `Self`.
+    self_path: TokenStream2,
+}
+
+fn gen_constructor(ctx: &ConstructorCtx, parsed: &ParsedFields<'_>) -> TokenStream2 {
+    let ConstructorCtx {
+        method_name,
+        with_method_name,
+        doc,
+        doc_with,
+        self_path,
+    } = ctx;
 
     let user_params: Vec<_> = parsed
         .user_fields
@@ -350,20 +409,46 @@ fn gen_constructor_enum(variant_name: &Ident, parsed: &ParsedFields<'_>) -> Toke
         quote! { let location = ::std::panic::Location::caller(); }
     });
 
-    let doc = format!("Constructs a [`{variant_name}`](Self::{variant_name}) error.");
-
     if let Some(src) = &parsed.source {
         let src_ident = &src.ident;
-        let src_ty = &src.ty;
-        quote! {
-            #[doc = #doc]
-            #[track_caller]
-            pub(crate) fn #method_name(#(#user_params),*) -> impl ::std::ops::FnOnce(#src_ty) -> Self {
-                #location_capture
-                move |#src_ident| Self::#variant_name {
-                    #src_ident,
-                    #(#user_field_names,)*
-                    #location_init
+
+        if parsed.optional_source {
+            let inner_ty = parsed.inner_source_ty.as_ref().unwrap();
+            quote! {
+                #[doc = #doc]
+                #[track_caller]
+                pub(crate) fn #method_name(#(#user_params),*) -> Self {
+                    #location_capture
+                    #self_path {
+                        #src_ident: None,
+                        #(#user_field_names,)*
+                        #location_init
+                    }
+                }
+
+                #[doc = #doc_with]
+                #[track_caller]
+                pub(crate) fn #with_method_name(#(#user_params),*) -> impl ::std::ops::FnOnce(#inner_ty) -> Self {
+                    #location_capture
+                    move |#src_ident| #self_path {
+                        #src_ident: Some(#src_ident),
+                        #(#user_field_names,)*
+                        #location_init
+                    }
+                }
+            }
+        } else {
+            let src_ty = &src.ty;
+            quote! {
+                #[doc = #doc]
+                #[track_caller]
+                pub(crate) fn #method_name(#(#user_params),*) -> impl ::std::ops::FnOnce(#src_ty) -> Self {
+                    #location_capture
+                    move |#src_ident| #self_path {
+                        #src_ident,
+                        #(#user_field_names,)*
+                        #location_init
+                    }
                 }
             }
         }
@@ -373,7 +458,7 @@ fn gen_constructor_enum(variant_name: &Ident, parsed: &ParsedFields<'_>) -> Toke
             #[track_caller]
             pub(crate) fn #method_name(#(#user_params),*) -> Self {
                 #location_capture
-                Self::#variant_name {
+                #self_path {
                     #(#user_field_names,)*
                     #location_init
                 }
@@ -382,58 +467,29 @@ fn gen_constructor_enum(variant_name: &Ident, parsed: &ParsedFields<'_>) -> Toke
     }
 }
 
+fn gen_constructor_enum(variant_name: &Ident, parsed: &ParsedFields<'_>) -> TokenStream2 {
+    let snake = variant_name.to_string().to_snake_case();
+    let ctx = ConstructorCtx {
+        method_name: Ident::new(&snake, variant_name.span()),
+        with_method_name: Ident::new(&format!("{snake}_with"), variant_name.span()),
+        doc: format!("Constructs a [`{variant_name}`](Self::{variant_name}) error."),
+        doc_with: format!(
+            "Constructs a [`{variant_name}`](Self::{variant_name}) error with a source."
+        ),
+        self_path: quote! { Self::#variant_name },
+    };
+    gen_constructor(&ctx, parsed)
+}
+
 fn gen_constructor_struct(type_name: &Ident, parsed: &ParsedFields<'_>) -> TokenStream2 {
-    let user_params: Vec<_> = parsed
-        .user_fields
-        .iter()
-        .map(|f| {
-            let ident = &f.ident;
-            let ty = &f.ty;
-            quote! { #ident: #ty }
-        })
-        .collect();
-
-    let user_field_names: Vec<_> = parsed.user_fields.iter().map(|f| &f.ident).collect();
-
-    let location_init = parsed.location.as_ref().map(|f| {
-        let ident = &f.ident;
-        quote! { #ident: location, }
-    });
-
-    let location_capture = parsed.location.as_ref().map(|_| {
-        quote! { let location = ::std::panic::Location::caller(); }
-    });
-
-    let doc = format!("Constructs a [`{type_name}`].");
-
-    if let Some(src) = &parsed.source {
-        let src_ident = &src.ident;
-        let src_ty = &src.ty;
-        quote! {
-            #[doc = #doc]
-            #[track_caller]
-            pub(crate) fn new(#(#user_params),*) -> impl ::std::ops::FnOnce(#src_ty) -> Self {
-                #location_capture
-                move |#src_ident| Self {
-                    #src_ident,
-                    #(#user_field_names,)*
-                    #location_init
-                }
-            }
-        }
-    } else {
-        quote! {
-            #[doc = #doc]
-            #[track_caller]
-            pub(crate) fn new(#(#user_params),*) -> Self {
-                #location_capture
-                Self {
-                    #(#user_field_names,)*
-                    #location_init
-                }
-            }
-        }
-    }
+    let ctx = ConstructorCtx {
+        method_name: Ident::new("new", type_name.span()),
+        with_method_name: Ident::new("new_with", type_name.span()),
+        doc: format!("Constructs a [`{type_name}`]."),
+        doc_with: format!("Constructs a [`{type_name}`] with a source."),
+        self_path: quote! { Self },
+    };
+    gen_constructor(&ctx, parsed)
 }
 
 fn gen_location_arm_enum(variant_name: &Ident, parsed: &ParsedFields<'_>) -> TokenStream2 {
@@ -452,8 +508,14 @@ fn gen_location_arm_enum(variant_name: &Ident, parsed: &ParsedFields<'_>) -> Tok
 fn gen_stack_source_arm_enum(variant_name: &Ident, parsed: &ParsedFields<'_>) -> TokenStream2 {
     if parsed.stack_source {
         let src_ident = &parsed.source.unwrap().ident;
-        quote! {
-            Self::#variant_name { #src_ident, .. } => Some(#src_ident as &dyn ::errorstack::ErrorStack),
+        if parsed.optional_source {
+            quote! {
+                Self::#variant_name { #src_ident, .. } => #src_ident.as_ref().map(|s| s as &dyn ::errorstack::ErrorStack),
+            }
+        } else {
+            quote! {
+                Self::#variant_name { #src_ident, .. } => Some(#src_ident as &dyn ::errorstack::ErrorStack),
+            }
         }
     } else {
         quote! {
